@@ -43,12 +43,59 @@
 .btn-whatsapp i {
     font-size: 18px;
 }
+
+
+/* --- Toast notification --- */
+.kk-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 99999;
+    min-width: 300px;
+    max-width: 400px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 500;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    opacity: 0;
+    transform: translateX(120%);
+    transition: opacity .35s ease, transform .35s ease;
+    pointer-events: none;
+}
+.kk-toast.show {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+}
+.kk-toast.success { background: #25D366; }
+.kk-toast.error   { background: #e63946; }
+.kk-toast i { font-size: 22px; flex-shrink: 0; }
+.kk-toast-close {
+    margin-left: auto;
+    cursor: pointer;
+    opacity: .75;
+    font-size: 18px;
+}
+.kk-toast-close:hover { opacity: 1; }
+
+/* État de chargement du bouton */
+#send_message.loading {
+    opacity: .7;
+    cursor: not-allowed;
+}
 </style>
 
 </head>
 
 <body>
     <div id="wrapper">
+        <div id="kk-toast-container"></div>
+
         <div class="float-text show-on-scroll">
             <span><a href="#">Scroll to top</a></span>
         </div>
@@ -595,56 +642,111 @@
     </script>
 
     <script>
-        emailjs.init({
-            publicKey: "EWwFlDtBVofx83X3Z"
+    emailjs.init({
+        publicKey: "EWwFlDtBVofx83X3Z"
+    });
+
+    /* ---------- Fonction toast moderne ---------- */
+    function showToast(message, type = 'success', duration = 4500) {
+        const container = document.getElementById('kk-toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'kk-toast ' + type;
+
+        const icon = type === 'success' ? 'icofont-check-circled' : 'icofont-close-circled';
+
+        toast.innerHTML =
+            '<i class="' + icon + '"></i>' +
+            '<span>' + message + '</span>' +
+            '<i class="icofont-close kk-toast-close"></i>';
+
+        container.appendChild(toast);
+
+        // Animation d'entrée
+        requestAnimationFrame(() => toast.classList.add('show'));
+
+        // Fermeture au clic
+        toast.querySelector('.kk-toast-close').addEventListener('click', () => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 400);
         });
 
-        function sendMail() {
+        // Fermeture automatique
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 400);
+        }, duration);
+    }
 
-            var name = document.getElementById("name").value;
-            var email = document.getElementById("email").value;
-            var phone = document.getElementById("phone").value;
-            var propertyType = document.getElementById("property-type").value;
-            var service = document.getElementById("service").value;
-            var userMessage = document.getElementById("message").value;
+    /* ---------- Réinitialisation du formulaire ---------- */
+    function resetForm() {
+        document.getElementById('name').value = '';
+        document.getElementById('email').value = '';
+        document.getElementById('phone').value = '';
+        document.getElementById('property-type').selectedIndex = 0;
+        document.getElementById('service').selectedIndex = 0;
+        document.getElementById('message').value = '';
+    }
 
-            if (!name || !email || !phone) {
-                alert('Bitte füllen Sie Name, E-Mail und Telefon aus.');
-                return;
-            }
+    /* ---------- Envoi du mail ---------- */
+    function sendMail() {
 
-            var fullMessage =
-                "Name: " + name + "\n" +
-                "E-Mail: " + email + "\n" +
-                "Telefon: " + phone + "\n" +
-                "Objekt-Typ: " + propertyType + "\n" +
-                "Leistung: " + service + "\n" +
-                "Nachricht: " + (userMessage || "-");
+        var name = document.getElementById("name").value.trim();
+        var email = document.getElementById("email").value.trim();
+        var phone = document.getElementById("phone").value.trim();
+        var propertyType = document.getElementById("property-type").value;
+        var service = document.getElementById("service").value;
+        var userMessage = document.getElementById("message").value.trim();
 
-            const params = {
-                subject: "Neue Anfrage von der Website",
-                name: name,
-                email: email,
-                phone: phone,
-                type: propertyType,
-                service: service,
-                message: userMessage
-            };
-
-            emailjs.send(
-                "service_vruldne",
-                "template_o7wfq9q",
-                params
-            )
-            .then(function () {
-                alert("Anfrage gesendet");
-            })
-            .catch(function (error) {
-                console.log(error);
-                alert("Fehler beim Senden. Bitte versuchen Sie es erneut.");
-            });
+        if (!name || !email || !phone) {
+            showToast('Bitte füllen Sie Name, E-Mail und Telefon aus.', 'error');
+            return;
         }
-    </script>
+
+        // Validation simple de l'email
+        var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            showToast('Bitte geben Sie eine gültige E-Mail-Adresse ein.', 'error');
+            return;
+        }
+
+        const params = {
+            subject: "Neue Anfrage von der Website",
+            name: name,
+            email: email,
+            phone: phone,
+            type: propertyType,
+            service: service,
+            message: userMessage || "-"
+        };
+
+        const btn = document.getElementById('send_message');
+        const originalValue = btn.value;
+
+        // État de chargement
+        btn.classList.add('loading');
+        btn.value = 'Wird gesendet...';
+        btn.disabled = true;
+
+        emailjs.send(
+            "service_vruldne",
+            "template_o7wfq9q",
+            params
+        )
+        .then(function () {
+            showToast('Vielen Dank! Ihre Anfrage wurde erfolgreich gesendet.', 'success');
+            resetForm();
+        })
+        .catch(function (error) {
+            console.error('EmailJS Fehler:', error);
+            showToast('Fehler beim Senden. Bitte versuchen Sie es erneut oder kontaktieren Sie uns per WhatsApp.', 'error');
+        })
+        .finally(function () {
+            btn.classList.remove('loading');
+            btn.value = originalValue;
+            btn.disabled = false;
+        });
+    }
+</script>
 
 </body>
 
